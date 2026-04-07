@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Taxfyle · GKT Campaign Attribution Report — March 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:13px}
+header{background:#0f172a;color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+header h1{font-size:17px;font-weight:700}
+header p{font-size:11px;color:#94a3b8;margin-top:2px}
+.month-sel{display:flex;align-items:center;gap:8px;font-size:12px;color:#cbd5e1}
+.month-sel select{padding:5px 9px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;cursor:pointer}
+.filters{background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 28px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.fg{display:flex;align-items:center;gap:5px}
+.fg label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px}
+.fg select{padding:5px 9px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;background:#f8fafc;color:#1e293b;cursor:pointer}
+.wrap{max-width:1340px;margin:0 auto;padding:20px}
+/* grand total */
+.gt{background:#0f172a;color:#fff;border-radius:11px;padding:14px 22px;margin-bottom:20px;display:flex;gap:28px;flex-wrap:wrap;align-items:center}
+.gt-item .gt-lbl{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.gt-item .gt-val{font-size:20px;font-weight:700}
+.gt-item .gt-val.cw{color:#4ade80}.gt-item .gt-val.uc{color:#fbbf24}.gt-item .gt-val.tot{color:#fff}
+.gt-div{width:1px;background:#1e293b;height:36px}
+/* kpis */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:8px}
+.kpi{background:#fff;border-radius:9px;padding:14px 16px;border-left:3px solid #6366f1;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.kpi.g{border-left-color:#22c55e}.kpi.o{border-left-color:#f59e0b}.kpi.b{border-left-color:#3b82f6}.kpi.r{border-left-color:#ef4444}
+.kpi-lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.kpi-val{font-size:22px;font-weight:700;color:#0f172a}
+.kpi-sub{font-size:10px;color:#cbd5e1;margin-top:2px}
+.cb{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:8px}
+.cb-meta{background:#fce7f3;color:#9d174d}.cb-dg{background:#fef3c7;color:#92400e}.cb-sem{background:#e0e7ff;color:#3730a3}
+/* campaign card */
+.cc{background:#fff;border-radius:11px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:20px;overflow:hidden}
+.ch{padding:14px 20px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.ch h3{font-size:13px;font-weight:700}.ch .utm{font-size:10px;color:#94a3b8;font-family:monospace;margin-top:2px}
+/* table */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f8fafc;padding:9px 11px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid #f1f5f9;color:#374151;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbfc}
+.nc strong{display:block;font-weight:600;color:#0f172a;font-size:12px}
+.nc span{display:block;font-size:10px;color:#94a3b8}
+.nc .nt{display:block;font-size:10px;color:#f59e0b;margin-top:2px}
+/* badges */
+.b{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.5}
+.b-nv{background:#dcfce7;color:#166534}.b-rt{background:#dbeafe;color:#1e40af}.b-sv{background:#f3f4f6;color:#6b7280}
+.b-cw{background:#bbf7d0;color:#14532d}.b-uc{background:#fef9c3;color:#713f12}.b-cc{background:#d1fae5;color:#065f46}
+.b-rn{background:#e0f2fe;color:#0c4a6e}.b-nj{background:#f3f4f6;color:#9ca3af}.b-wn{background:#fee2e2;color:#991b1b}
+.check{color:#22c55e;font-weight:700}.cross{color:#d1d5db}
+/* summary */
+.sw{padding:14px 20px 18px;border-top:2px solid #f1f5f9}
+.sw h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px}
+.stbl{width:100%;border-collapse:collapse;font-size:11px}
+.stbl th{background:#f8fafc;padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid #e2e8f0}
+.stbl td{padding:7px 10px;border-bottom:1px solid #f8fafc;color:#374151}
+.stbl tr.tot-row td{background:#f0f9ff;font-weight:700;color:#0f172a;border-top:2px solid #e2e8f0}
+.amt{font-family:monospace;font-size:11px}
+.amt.cw{color:#15803d;font-weight:700}.amt.uc{color:#b45309;font-weight:700}.amt.tot{color:#0f172a;font-weight:700}
+.empty td{color:#cbd5e1;font-style:italic;text-align:center;padding:18px}
+/* source summary */
+.src-card{background:#fff;border-radius:11px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:18px 22px;margin-bottom:20px}
+.src-card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:14px}
+.src-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.src-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}
+.src-row .src-lbl{flex:1;font-size:12px;font-weight:600;color:#1e293b}
+.src-row .src-stat{text-align:right;font-size:11px;color:#64748b}
+.src-row .src-stat strong{display:block;font-size:15px;font-weight:700;color:#0f172a}
+.src-row .src-stat .src-sub{font-size:10px;color:#94a3b8}
+.src-bar-wrap{margin-top:3px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden}
+.src-bar{height:100%;border-radius:2px}
+/* notes */
+.notes{background:#fff;border-radius:11px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:20px;margin-top:6px}
+.notes h3{font-size:12px;font-weight:700;color:#374151;margin-bottom:12px;border-bottom:1px solid #f1f5f9;padding-bottom:8px}
+.ni{margin-bottom:10px;padding-left:12px;border-left:3px solid #e2e8f0}
+.ni strong{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:2px}
+.ni p{font-size:11px;color:#6b7280;line-height:1.5}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Taxfyle · GKT Campaign Attribution Report</h1>
+    <p id="subtitle">March 2026 · As of March 29 · PostHog × HubSpot · <span style="color:#4ade80;font-weight:600">CONFIDENTIAL — GKT Team</span></p>
+  </div>
+  <div class="month-sel">
+    📅
+    <select id="msel" onchange="chMonth()">
+      <option value="01">January 2026</option>
+      <option value="02">February 2026</option>
+      <option value="03" selected>March 2026</option>
+      <option value="04">April 2026</option>
+      <option value="05">May 2026</option>
+      <option value="06">June 2026</option>
+      <option value="07">July 2026</option>
+      <option value="08">August 2026</option>
+      <option value="09">September 2026</option>
+      <option value="10">October 2026</option>
+      <option value="11">November 2026</option>
+      <option value="12">December 2026</option>
+    </select>
+  </div>
+</header>
+
+<div class="filters">
+  <div class="fg"><label>Week</label>
+    <select id="fw" onchange="applyF()">
+      <option value="">All</option>
+      <option value="S1">W1 (Mar 1–8)</option>
+      <option value="S2">W2 (Mar 9–15)</option>
+      <option value="S3">W3 (Mar 16–22)</option>
+      <option value="S4">W4 (Mar 23–29)</option>
+    </select>
+  </div>
+  <div class="fg"><label>Campaign</label>
+    <select id="fc" onchange="applyF()">
+      <option value="">All</option>
+      <option value="meta">Meta B2C</option>
+      <option value="dg">Google DG B2C</option>
+      <option value="sem">Google Sembrand B2B</option>
+    </select>
+  </div>
+  <div class="fg"><label>Attribution</label>
+    <select id="fa" onchange="applyF()">
+      <option value="">All</option>
+      <option value="NEW">New</option>
+      <option value="RETARGETING">Retargeting</option>
+    </select>
+  </div>
+  <div class="fg"><label>Job</label>
+    <select id="fj" onchange="applyF()">
+      <option value="">All</option>
+      <option value="1">With job ✅</option>
+      <option value="0">No job ❌</option>
+    </select>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="gt" id="gt"></div>
+  <div id="kpis"></div>
+  <div id="src-summary"></div>
+  <div id="pie-section"></div>
+  <div id="camps"></div>
+  <div class="notes">
+    <h3>📋 Report Methodology — GKT Campaign Attribution (March 2026 · April 2026)</h3>
+    <p style="font-size:11px;color:#6b7280;margin-bottom:14px">Data sources: <strong>PostHog</strong> (signup events) + <strong>HubSpot</strong> (contact creation, deals, original source). No other sources are used.</p>
+
+    <div class="ni"><strong>1. Signup Source (PostHog)</strong><p>
+      Event: <code>$identify</code> · Period: <code>2026-03-01 ≤ timestamp &lt; 2026-04-01</code> · Filters: <code>workspace_id IS NOT NULL</code> (confirms real B2B signup) · <code>email IS NOT NULL</code> · Exclude bots matching <code>geogatedctr%@gmail.com</code>
+    </p></div>
+
+    <div class="ni"><strong>2. Campaign Attribution</strong><p>
+      Field used: <code>person.properties.$initial_utm_campaign</code> (Initial UTM — NOT session UTM). Only the 3 exact campaign values are tracked:<br>
+      <code>GKT-BOFU-META-CV-US-B2C-AON</code> · <code>GKT-BOFU-GG-CV-US-B2C-DG-AON</code> · <code>GKT-BOFU-GG-CV-US-B2B-sembrand-AON</code><br>
+      If a contact appears multiple times, records are grouped by email + campaign and the earliest <code>min(timestamp)</code> is used as the signup date.
+    </p></div>
+
+    <div class="ni"><strong>3. New vs. Retargeting Classification (HubSpot)</strong><p>
+      Contact email from PostHog is matched to HubSpot by email field.<br>
+      <strong>New</strong> = <code>hs_createdate ≥ 2026-03-01</code> (first time in HubSpot) ·
+      <strong>Retargeting</strong> = <code>hs_createdate &lt; 2026-03-01</code> (pre-existing contact re-engaged by campaign)
+    </p></div>
+
+    <div class="ni"><strong>4. Original Source (informational only)</strong><p>
+      Field: <code>hs_analytics_source</code> from HubSpot. Shows how the contact was <em>originally acquired</em> — not how they were attributed to this campaign. This field is purely descriptive and does <strong>not</strong> affect inclusion logic.
+    </p></div>
+
+    <div class="ni"><strong>5. Revenue Classification (HubSpot deals)</strong><p>
+      Only deals with <code>createdate ≥ 2026-03-01</code> are counted.<br>
+      <strong>Closed Won (CW)</strong> = <code>hs_is_closed_won = true</code> ·
+      <strong>Under Construction (UC)</strong> = active deal (not closed) ·
+      <strong>No Job</strong> = no March HubSpot deal found.<br>
+      Without GoWork integration, Renewal classification is not available — contacts should be validated line by line in HubSpot.
+    </p></div>
+
+    <div class="ni"><strong>6. Week Definition</strong><p>
+      W1 = Mar 1–8 · W2 = Mar 9–15 · W3 = Mar 16–22 · W4 = Mar 23–31 · Based on PostHog signup date (cs field), not HubSpot createdate.
+    </p></div>
+
+    <div class="ni"><strong>7. Confidentiality — GKT Protocol</strong><p>
+      Contact emails are not displayed in the detail tables. Each row uses a sequential Contact ID (C-001, C-002, …). Raw data with emails is available upon request to the GKT team lead.
+    </p></div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────
+const CAMPS = [
+{
+  id:"meta", name:"Meta B2C", utm:"GKT-BOFU-META-CV-US-B2C-AON", cls:"cb-meta",
+  contacts:[
+    {s:"S1",em:"jerriwilliams1974@gmail.com",hc:"2026-03-01",cs:"2026-03-01",at:"NEW",hj:true,ta:3100,cw:0,uc:3100,os:"PAID_SOCIAL"},
+    {s:"S1",em:"cowank442@gmail.com",hc:"2026-03-03",cs:"2026-03-03",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"kcanady119@gmail.com",hc:"2026-03-12",cs:"2026-03-11",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"coreyclayton211@gmail.com",hc:"2026-03-15",cs:"2026-03-15",at:"NEW",hj:true,ta:450,cw:0,uc:450,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"jasonandriki2026@gmail.com",hc:"2026-03-16",cs:"2026-03-16",at:"NEW",hj:true,ta:5398,cw:0,uc:5398,os:"PAID_SOCIAL"},
+    {s:"S3",em:"info@ernstfinancialservices.org",hc:"2026-03-19",cs:"2026-03-18",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"},
+    {s:"S3",em:"ftoddricus69@gmail.com",hc:"2026-03-19",cs:"2026-03-19",at:"NEW",hj:true,ta:450,cw:0,uc:450,os:"PAID_SOCIAL"},
+    {s:"S3",em:"kenflosmooth2@gmail.com",hc:"2026-03-20",cs:"2026-03-20",at:"NEW",hj:true,ta:1350,cw:0,uc:1350,os:"REFERRALS"},
+    {s:"S4",em:"choloelloko1981@gmail.com",hc:"2026-03-27",cs:"2026-03-27",at:"NEW",hj:true,ta:900,cw:0,uc:900,os:"PAID_SOCIAL"},
+    {s:"S4",em:"tradley52@gmail.com",hc:"2026-03-30",cs:"2026-03-30",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"},
+    {s:"S4",em:"lboillard196054@gmail.com",hc:"2026-03-31",cs:"2026-03-31",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"}
+  ],
+  sum:{tc:11,tj:7,nv:11,rt:0,cw:0,uc:11898,tot:11898,
+    bw:{S1:{l:"W1 (Mar 1–8)",c:2,j:1,nv:2,rt:0,cw:0,uc:3100,t:3100},S2:{l:"W2 (Mar 9–15)",c:2,j:2,nv:2,rt:0,cw:0,uc:700,t:700},S3:{l:"W3 (Mar 16–22)",c:4,j:3,nv:4,rt:0,cw:0,uc:7198,t:7198},S4:{l:"W4 (Mar 23–29)",c:3,j:1,nv:3,rt:0,cw:0,uc:900,t:900}}}
+},
+{
+  id:"dg", name:"Google DG B2C", utm:"GKT-BOFU-GG-CV-US-B2C-DG-AON", cls:"cb-dg",
+  contacts:[
+    {s:"S1",em:"christobellecrayton@gmail.com",hc:"2026-03-04",cs:"2026-03-04",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"OFFLINE"},
+    {s:"S2",em:"antonetmoses35@gmail.com",hc:"2026-03-10",cs:"2026-03-10",at:"NEW",hj:true,ta:350,cw:0,uc:350,os:"PAID_SEARCH"},
+    {s:"S4",em:"curtissmith2561@gmail.com",hc:"2026-03-24",cs:"2026-03-23",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"edohara19@gmail.com",hc:"2026-03-28",cs:"2026-03-27",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"}
+  ],
+  sum:{tc:4,tj:3,nv:4,rt:0,cw:0,uc:850,tot:850,
+    bw:{S1:{l:"W1 (Mar 1–8)",c:1,j:1,nv:1,rt:0,cw:0,uc:250,t:250},S2:{l:"W2 (Mar 9–15)",c:1,j:1,nv:1,rt:0,cw:0,uc:350,t:350},S3:{l:"W3 (Mar 16–22)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S4:{l:"W4 (Mar 23–29)",c:2,j:1,nv:2,rt:0,cw:0,uc:250,t:250}}}
+},
+{
+  id:"sem", name:"Google Sembrand B2B", utm:"GKT-BOFU-GG-CV-US-B2B-sembrand-AON", cls:"cb-sem",
+  contacts:[
+    {s:"S1",em:"paulpang@gmail.com",hc:"2026-03-01",cs:"2026-03-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"brianwis2537@gmail.com",hc:"2024-01-28",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"joshyoung24@gmail.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:true,ta:405,cw:405,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"esgregory@gmail.com",hc:"2025-06-10",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"stacyawjones@gmail.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"erinemre06@gmail.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"gaurab.aryal7@gmail.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"jnaadjie@afrails.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"dip@alphatrend.ai",hc:"2022-02-17",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"gianni1097@gmail.com",hc:"2026-02-16",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"quinns@nautalytics.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:true,ta:1200,cw:1200,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"speronm04@gmail.com",hc:"2026-03-02",cs:"2026-03-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"borggio.joaquin@gmail.com",hc:"2026-03-02",cs:"2026-03-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"lkperez88@gmail.com",hc:"2021-07-06",cs:"2026-03-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"nicholasboni50@gmail.com",hc:"2024-03-12",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"sravnsborg@gmail.com",hc:"2026-02-25",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"starbirdjen1@gmail.com",hc:"2026-03-02",cs:"2026-03-02",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"lance.marlow05@gmail.com",hc:"2021-07-06",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"georgechusted@gmail.com",hc:"2026-03-02",cs:"2026-03-02",at:"NEW",hj:true,ta:450,cw:0,uc:450,os:"OFFLINE"},
+    {s:"S1",em:"pjvern@hotmail.com",hc:"2026-02-13",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"esparzaconstructionsolutions@gmail.com",hc:"2021-07-06",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"autumncomgr@gmail.com",hc:"2026-03-02",cs:"2026-03-02",at:"NEW",hj:true,ta:1650,cw:0,uc:1650,os:"OFFLINE"},
+    {s:"S1",em:"pettustap@gmail.com",hc:"2026-02-27",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"dvwmissionviejo@gmail.com",hc:"2026-02-25",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"alex@techfp.com",hc:"2026-03-02",cs:"2026-03-02",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"ryan.hiser@gmail.com",hc:"2022-04-04",cs:"2026-03-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"ryangbarker18@yahoo.com",hc:"2025-02-14",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"pyoon571@gmail.com",hc:"2026-02-19",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"metisse.lutz@gmail.com",hc:"2022-03-22",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"laurenknochelmann@gmail.com",hc:"2021-07-06",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"nicole@keepbooking.org",hc:"2024-02-21",cs:"2026-03-03",at:"RETARGETING",hj:true,ta:880,cw:880,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"stacywaller@me.com",hc:"2021-07-06",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"gansvv@gmail.com",hc:"2025-08-30",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S1",em:"islandty88@gmail.com",hc:"2026-03-03",cs:"2026-03-03",at:"NEW",hj:true,ta:425,cw:250,uc:175,os:"OFFLINE"},
+    {s:"S1",em:"lynnoliver607@gmail.com",hc:"2026-02-02",cs:"2026-03-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"akcirkelis@gmail.com",hc:"2026-02-11",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"samadjafri1@gmail.com",hc:"2021-07-06",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"yinshi@akia.com",hc:"2024-02-06",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"travisfranklin@gmail.com",hc:"2026-02-26",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"davegiglio87@gmail.com",hc:"2023-03-21",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"jeremykalmus@me.com",hc:"2021-07-06",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"corentinh@gmail.com",hc:"2021-07-06",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"kristamrios@gmail.com",hc:"2025-05-12",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"REFERRALS"},
+    {s:"S1",em:"4jefong@gmail.com",hc:"2022-03-26",cs:"2026-03-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"celu.jn31@gmail.com",hc:"2026-03-05",cs:"2026-03-04",at:"NEW",hj:true,ta:1450,cw:0,uc:1450,os:"OFFLINE"},
+    {s:"S1",em:"alidde@outlook.com",hc:"2026-03-04",cs:"2026-03-05",at:"NEW",hj:true,ta:630,cw:630,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"barattiniholdings@gmail.com",hc:"2021-07-06",cs:"2026-03-05",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"erin.yob03@gmail.com",hc:"2021-07-07",cs:"2026-03-05",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"pricklypearproperties.az@gmail.com",hc:"2026-03-06",cs:"2026-03-06",at:"NEW",hj:true,ta:960,cw:0,uc:960,os:"OFFLINE"},
+    {s:"S1",em:"npcastagna@gmail.com",hc:"2026-03-06",cs:"2026-03-06",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"OFFLINE"},
+    {s:"S1",em:"marleranna@gmail.com",hc:"2026-01-07",cs:"2026-03-06",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"alexawildesheldon@gmail.com",hc:"2023-03-17",cs:"2026-03-06",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"pmsinger@comcast.net",hc:"2025-12-29",cs:"2026-03-06",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"feelfreeinstitute@gmail.com",hc:"2025-02-17",cs:"2026-03-06",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"laurenruka@gmail.com",hc:"2026-02-08",cs:"2026-03-06",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"hello@aspenhearted.com",hc:"2024-01-02",cs:"2026-03-07",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"hnlawson@comcast.net",hc:"2026-03-08",cs:"2026-03-07",at:"NEW",hj:true,ta:1304,cw:0,uc:1304,os:"OFFLINE"},
+    {s:"S1",em:"mgconnell@gmail.com",hc:"2025-02-07",cs:"2026-03-07",at:"RETARGETING",hj:true,ta:360,cw:360,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"dscottreid01@gmail.com",hc:"2026-03-08",cs:"2026-03-07",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"munchiesbymallory@gmail.com",hc:"2025-09-15",cs:"2026-03-08",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"andrea.e.renteria@gmail.com",hc:"2026-03-08",cs:"2026-03-08",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"admin@purerentalgroup.com",hc:"2023-05-15",cs:"2026-03-08",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"ck@taranis.org",hc:"2026-03-08",cs:"2026-03-08",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"lillie.estelle@gmail.com",hc:"2021-07-07",cs:"2026-03-08",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"thomas.l.rairdon@gmail.com",hc:"2026-03-09",cs:"2026-03-08",at:"NEW",hj:true,ta:1830,cw:0,uc:1830,os:"OFFLINE"},
+    {s:"S2",em:"nilou.safinya@gmail.com",hc:"2021-07-06",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"msdianelacroix@gmail.com",hc:"2026-03-04",cs:"2026-03-09",at:"NEW",hj:true,ta:344,cw:344,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"tongfangwang@outlook.com",hc:"2025-02-23",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S2",em:"nadyahorne@gmail.com",hc:"2026-03-07",cs:"2026-03-09",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"cpz4480@gmail.com",hc:"2026-03-09",cs:"2026-03-09",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"OFFLINE"},
+    {s:"S2",em:"rochellemouriz@gmail.com",hc:"2022-03-31",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"REFERRALS"},
+    {s:"S2",em:"crbarattini@gmail.com",hc:"2021-07-06",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"franco.woolfe@gmail.com",hc:"2026-03-09",cs:"2026-03-09",at:"NEW",hj:true,ta:974,cw:344,uc:630,os:"OFFLINE"},
+    {s:"S2",em:"joshua.ingles@gmail.com",hc:"2026-03-09",cs:"2026-03-09",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"atsavessylvia@gmail.com",hc:"2023-04-09",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"jesse@kairosclassroom.com",hc:"2022-02-15",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S2",em:"zixiwang001@gmail.com",hc:"2021-07-07",cs:"2026-03-09",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"jd@jeremydeputat.com",hc:"2025-09-15",cs:"2026-03-10",at:"RETARGETING",hj:true,ta:1320,cw:1320,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"robert@missioncultivate.com",hc:"2021-07-06",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"cauhoi+taxfyle@gmail.com",hc:"2021-07-06",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"jimmy@domainmoney.com",hc:"2026-03-10",cs:"2026-03-10",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S2",em:"atalbenz@gmail.com",hc:"2024-11-18",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"kenneys01@gmail.com",hc:"2025-03-13",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"fteplits@gmail.com",hc:"2021-07-06",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"nunezum2015@gmail.com",hc:"2022-04-04",cs:"2026-03-10",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"adriennevan@gmail.com",hc:"2021-07-06",cs:"2026-03-10",at:"RETARGETING",hj:true,ta:250,cw:250,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"karidisnatalia@gmail.com",hc:"2026-03-10",cs:"2026-03-10",at:"NEW",hj:true,ta:360,cw:0,uc:360,os:"PAID_SEARCH"},
+    {s:"S2",em:"tripfernandes@gmail.com",hc:"2026-03-11",cs:"2026-03-11",at:"NEW",hj:true,ta:330,cw:330,uc:0,os:"PAID_SEARCH"},
+    {s:"S2",em:"tichikawa@yahoo.com",hc:"2025-06-05",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"brian@jellibean.co",hc:"2022-03-30",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"aovaron@gmail.com",hc:"2021-07-07",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"shantihcoro@gmail.com",hc:"2021-07-06",cs:"2026-03-11",at:"RETARGETING",hj:true,ta:1200,cw:0,uc:1200,os:"OFFLINE"},
+    {s:"S2",em:"contact@leelanau-clothing.com",hc:"2021-07-06",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"ndsorensen56@gmail.com",hc:"2024-02-03",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"brendan.ciecko@gmail.com",hc:"2021-07-06",cs:"2026-03-11",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"roselynnkempis@gmail.com",hc:"2026-03-12",cs:"2026-03-11",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S2",em:"nsatish@gmail.com",hc:"2022-09-12",cs:"2026-03-12",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"jason@saludbeershop.com",hc:"2021-07-07",cs:"2026-03-12",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"matth.hong@gmail.com",hc:"2026-03-13",cs:"2026-03-12",at:"NEW",hj:true,ta:860,cw:0,uc:860,os:"OFFLINE"},
+    {s:"S2",em:"candace.melendrez@gmail.com",hc:"2021-07-07",cs:"2026-03-13",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"rahulawasthy@gmail.com",hc:"2025-01-28",cs:"2026-03-13",at:"RETARGETING",hj:true,ta:412,cw:412,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"team@vestora.ai",hc:"2026-02-01",cs:"2026-03-13",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"laurenramos10@gmail.com",hc:"2026-03-14",cs:"2026-03-14",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S2",em:"smathews10@gmail.com",hc:"2021-07-06",cs:"2026-03-14",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"smathews11@gmail.com",hc:"2021-07-06",cs:"2026-03-14",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"ryanhecht@gmail.com",hc:"2022-02-14",cs:"2026-03-14",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S2",em:"thefarmatcaracara@gmail.com",hc:"2024-02-28",cs:"2026-03-14",at:"RETARGETING",hj:true,ta:1650,cw:0,uc:1650,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"weixiao1984@gmail.com",hc:"2021-07-06",cs:"2026-03-14",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"admin@practicery.com",hc:"2021-07-06",cs:"2026-03-14",at:"RETARGETING",hj:true,ta:1200,cw:0,uc:1200,os:"OFFLINE"},
+    {s:"S2",em:"lugo.gabriel.math@gmail.com",hc:"2026-03-14",cs:"2026-03-14",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S2",em:"kristenlpia@gmail.com",hc:"2025-02-16",cs:"2026-03-14",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S2",em:"mitch@rosecapitaladvisors.com",hc:"2022-06-07",cs:"2026-03-15",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S2",em:"mike.mueller@hey.com",hc:"2021-07-06",cs:"2026-03-15",at:"RETARGETING",hj:true,ta:430,cw:430,uc:0,os:"OFFLINE"},
+    {s:"S2",em:"kathleens1978@gmail.com",hc:"2021-07-06",cs:"2026-03-15",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"chelsea@c-scenic.com",hc:"2021-07-06",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"nitin.mathur88@gmail.com",hc:"2021-07-06",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"andrea@alentadotc.com",hc:"2021-07-06",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"vserles@cpahsa.com",hc:"2022-06-29",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"brian.mcdonnell@healmd.us",hc:"2026-03-12",cs:"2026-03-16",at:"NEW",hj:true,ta:1200,cw:1200,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"cfreeman@savranbenson.com",hc:"2026-03-16",cs:"2026-03-16",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"zzhu56@yahoo.com",hc:"2026-01-06",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"ssuarez0530@gmail.com",hc:"2025-02-20",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S3",em:"andersonb577@gmail.com",hc:"2024-02-13",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"sodevious.net@gmail.com",hc:"2021-07-07",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"chaselrichman@gmail.com",hc:"2026-03-16",cs:"2026-03-16",at:"NEW",hj:true,ta:837,cw:837,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"naoyataylor@gmail.com",hc:"2023-04-04",cs:"2026-03-16",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"diwasblack@gmail.com",hc:"2021-07-06",cs:"2026-03-17",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"may@forprivateclients.com",hc:"2024-07-17",cs:"2026-03-17",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"katlin.stanley@gmail.com",hc:"2026-03-17",cs:"2026-03-17",at:"NEW",hj:true,ta:450,cw:450,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"stephanie.osber@gmail.com",hc:"2026-03-17",cs:"2026-03-17",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"caroline.g.trujillo@gmail.com",hc:"2021-07-06",cs:"2026-03-17",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"organicallyashley@gmail.com",hc:"2026-03-18",cs:"2026-03-18",at:"NEW",hj:true,ta:2240,cw:2240,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"kasinaeu@gmail.com",hc:"2026-03-18",cs:"2026-03-18",at:"NEW",hj:true,ta:200,cw:200,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"michell_sarquez@me.com",hc:"2023-03-18",cs:"2026-03-18",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"travis@campaignrefinery.com",hc:"2023-04-26",cs:"2026-03-18",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"hello@table75.com",hc:"2026-03-18",cs:"2026-03-18",at:"NEW",hj:true,ta:1320,cw:1320,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"rb2investments@gmail.com",hc:"2025-03-04",cs:"2026-03-18",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"yatzelfuentes80@yahoo.com",hc:"2026-02-01",cs:"2026-03-18",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"agonzalezjr15@gmail.com",hc:"2026-03-19",cs:"2026-03-19",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"brian.roberts@salesforce.com",hc:"2025-03-04",cs:"2026-03-19",at:"RETARGETING",hj:true,ta:225,cw:0,uc:225,os:"OFFLINE"},
+    {s:"S3",em:"kolodovski@gmail.com",hc:"2026-03-20",cs:"2026-03-20",at:"NEW",hj:true,ta:430,cw:0,uc:430,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"reubendemaster@gmail.com",hc:"2025-04-15",cs:"2026-03-20",at:"RETARGETING",hj:true,ta:360,cw:0,uc:360,os:"OFFLINE"},
+    {s:"S3",em:"daire.dalton@gmail.com",hc:"2026-02-14",cs:"2026-03-20",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"carlota.querol09@gmail.com",hc:"2023-10-06",cs:"2026-03-20",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"freise29@gmail.com",hc:"2026-03-10",cs:"2026-03-20",at:"NEW",hj:true,ta:350,cw:350,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"hakanaksoy6004@gmail.com",hc:"2026-03-20",cs:"2026-03-20",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"simone@ofonekind.com",hc:"2025-03-07",cs:"2026-03-20",at:"RETARGETING",hj:true,ta:371,cw:371,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"jpooranmal@google.com",hc:"2023-03-23",cs:"2026-03-20",at:"RETARGETING",hj:true,ta:180,cw:0,uc:180,os:"OFFLINE"},
+    {s:"S3",em:"kfondren2@gmail.com",hc:"2026-03-20",cs:"2026-03-20",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"AI_REFERRALS"},
+    {s:"S3",em:"kutsa006@gmail.com",hc:"2026-03-21",cs:"2026-03-21",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"arbazznizami@gmail.com",hc:"2026-03-21",cs:"2026-03-21",at:"NEW",hj:true,ta:1730,cw:0,uc:1730,os:"PAID_SEARCH"},
+    {s:"S3",em:"jbeane16@gmail.com",hc:"2026-03-21",cs:"2026-03-21",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"antoinettewade7@gmail.com",hc:"2024-08-26",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"rsobacki@pellawi.com",hc:"2026-03-21",cs:"2026-03-21",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S3",em:"jmin@jkmarchitecture.com",hc:"2024-03-08",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"quaker4lyf@gmail.com",hc:"2021-07-06",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"aezwiener@gmail.com",hc:"2025-04-09",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"mari_bertoldi@hotmail.com",hc:"2022-02-25",cs:"2026-03-21",at:"RETARGETING",hj:true,ta:350,cw:350,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"kyle.smith@benchmarkenvironmental.com",hc:"2025-03-27",cs:"2026-03-21",at:"RETARGETING",hj:true,ta:180,cw:0,uc:180,os:"OFFLINE"},
+    {s:"S3",em:"hernantorrisi@gmail.com",hc:"2025-04-10",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S3",em:"lisasemail3@yahoo.com",hc:"2025-12-01",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"achaud39@asu.edu",hc:"2022-04-11",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"gaolingyunabc@gmail.com",hc:"2021-07-06",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"kmckenney2000@gmail.com",hc:"2025-03-04",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S3",em:"rutherford.robert@gmail.com",hc:"2024-08-07",cs:"2026-03-21",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"jstirnaman@influxdata.com",hc:"2026-02-26",cs:"2026-03-22",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"fatthews@gmail.com",hc:"2022-03-03",cs:"2026-03-22",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S3",em:"jesus@bizzybeeny.com",hc:"2021-08-30",cs:"2026-03-22",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"REFERRALS"},
+    {s:"S3",em:"impuestosclaros@outlook.com",hc:"2026-03-22",cs:"2026-03-22",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S3",em:"my-service-registrations@outlook.com",hc:"2026-03-22",cs:"2026-03-22",at:"NEW",hj:true,ta:330,cw:0,uc:330,os:"OFFLINE"},
+    {s:"S3",em:"carndtwfb@aol.com",hc:"2026-01-20",cs:"2026-03-22",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"iam@jasontriplett.llc",hc:"2024-11-06",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"keaganmckinley1@gmail.com",hc:"2026-03-23",cs:"2026-03-23",at:"NEW",hj:true,ta:430,cw:0,uc:430,os:"PAID_SEARCH"},
+    {s:"S4",em:"taxes@jasontriplett.com",hc:"2026-03-23",cs:"2026-03-23",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"aleaberle94@hotmail.com",hc:"2024-02-26",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"danielcheney6@gmail.com",hc:"2021-07-06",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"gnicol93@yahoo.com",hc:"2025-12-01",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"caldonia@namehashlabs.org",hc:"2024-03-27",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"joeysolla@gmail.com",hc:"2026-03-23",cs:"2026-03-23",at:"NEW",hj:true,ta:162.5,cw:162.5,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"and.calcagno@gmail.com",hc:"2026-03-23",cs:"2026-03-23",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S4",em:"marianojperez@gmail.com",hc:"2026-03-23",cs:"2026-03-23",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"anna.aprelenko@yahoo.com",hc:"2026-01-01",cs:"2026-03-23",at:"RETARGETING",hj:true,ta:175,cw:175,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"tianhao.wu.468@gmail.com",hc:"2021-07-06",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"ofayle@gmail.com",hc:"2026-03-14",cs:"2026-03-23",at:"NEW",hj:true,ta:215,cw:215,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"hyd1505@gmail.com",hc:"2021-07-06",cs:"2026-03-23",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"siobhanberry@hotmail.co.uk",hc:"2026-03-24",cs:"2026-03-24",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S4",em:"yooyisol@gmail.com",hc:"2026-03-24",cs:"2026-03-24",at:"NEW",hj:true,ta:1650,cw:0,uc:1650,os:"PAID_SEARCH"},
+    {s:"S4",em:"dmbaig@gmail.com",hc:"2025-03-22",cs:"2026-03-24",at:"RETARGETING",hj:true,ta:2250,cw:0,uc:2250,os:"PAID_SEARCH"},
+    {s:"S4",em:"nurserachael82@gmail.com",hc:"2026-03-24",cs:"2026-03-24",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"payment@chemicloud.com",hc:"2021-07-06",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"daclark.ent@gmail.com",hc:"2024-03-27",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"tkangarloo89@gmail.com",hc:"2021-07-06",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"sigala0421@gmail.com",hc:"2026-03-25",cs:"2026-03-25",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"pcondonjr@gmail.com",hc:"2026-03-25",cs:"2026-03-25",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S4",em:"hi@lifeforceunit.co",hc:"2023-04-04",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"arora.siddharth001@gmail.com",hc:"2021-07-06",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"thisiszhuyilun@gmail.com",hc:"2021-07-06",cs:"2026-03-25",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"chhabriasuresh1220@gmail.com",hc:"2026-03-26",cs:"2026-03-26",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S4",em:"rsharkawi@gmail.com",hc:"2025-03-10",cs:"2026-03-26",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S4",em:"kristina.krause82@gmail.com",hc:"2026-03-09",cs:"2026-03-26",at:"NEW",hj:true,ta:350,cw:350,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"prenwickwhs@gmail.com",hc:"2026-03-20",cs:"2026-03-26",at:"NEW",hj:true,ta:550,cw:200,uc:350,os:"OFFLINE"},
+    {s:"S4",em:"mimikwan@me.com",hc:"2026-03-26",cs:"2026-03-26",at:"NEW",hj:true,ta:6600,cw:0,uc:6600,os:"PAID_SEARCH"},
+    {s:"S4",em:"mauricio.gutierrez24@gmail.com",hc:"2025-11-20",cs:"2026-03-26",at:"RETARGETING",hj:true,ta:180,cw:180,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"pcisom@gmail.com",hc:"2026-03-27",cs:"2026-03-26",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"jesscastillohair@gmail.com",hc:"2025-09-15",cs:"2026-03-27",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"karen.willberg@yahoo.com",hc:"2026-03-27",cs:"2026-03-27",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"colinsbock@gmail.com",hc:"2021-07-06",cs:"2026-03-27",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"wg.joyner@icloud.com",hc:"2021-07-06",cs:"2026-03-27",at:"RETARGETING",hj:true,ta:450,cw:0,uc:450,os:"OFFLINE"},
+    {s:"S4",em:"dtauerbach@gmail.com",hc:"2026-03-27",cs:"2026-03-27",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"sergiodauria@gmail.com",hc:"2024-08-29",cs:"2026-03-27",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"quinnf11@gmail.com",hc:"2025-02-02",cs:"2026-03-27",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"supradams9@gmail.com",hc:"2025-10-08",cs:"2026-03-27",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"officialwifi@icloud.com",hc:"2026-03-27",cs:"2026-03-27",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"jessica.afalla.29@gmail.com",hc:"2026-03-27",cs:"2026-03-27",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"sarah.gordon09@gmail.com",hc:"2026-03-28",cs:"2026-03-28",at:"NEW",hj:true,ta:1830,cw:0,uc:1830,os:"PAID_SEARCH"},
+    {s:"S4",em:"kaylaandsarahphotography@gmail.com",hc:"2026-03-28",cs:"2026-03-28",at:"NEW",hj:true,ta:3949.93,cw:0,uc:3949.93,os:"PAID_SEARCH"},
+    {s:"S4",em:"fia5005@alumni.psu.edu",hc:"2026-03-28",cs:"2026-03-28",at:"NEW",hj:true,ta:500,cw:0,uc:500,os:"PAID_SEARCH"},
+    {s:"S4",em:"jscalezbusiness@gmail.com",hc:"2025-09-15",cs:"2026-03-28",at:"RETARGETING",hj:true,ta:3679.08,cw:0,uc:3679.08,os:"OFFLINE"},
+    {s:"S4",em:"purushothamkamath@gmail.com",hc:"2021-07-06",cs:"2026-03-28",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"atulkalantri@gmail.com",hc:"2021-07-06",cs:"2026-03-29",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"vishrutps@gmail.com",hc:"2021-07-06",cs:"2026-03-29",at:"RETARGETING",hj:true,ta:315,cw:315,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"mixturebill@gmail.com",hc:"2021-07-06",cs:"2026-03-29",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"mrcarter808@gmail.com",hc:"2026-03-29",cs:"2026-03-29",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"chrisjhernandez92@gmail.com",hc:"2026-03-29",cs:"2026-03-29",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"geoff.gregoire@gmail.com",hc:"2024-04-14",cs:"2026-03-29",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"ralvarez95c@gmail.com",hc:"2021-07-06",cs:"2026-03-29",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"meister.alex@protonmail.com",hc:"2026-03-19",cs:"2026-03-30",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"elizabeth.caven@gmail.com",hc:"2026-02-12",cs:"2026-03-30",at:"RETARGETING",hj:true,ta:430,cw:430,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"ngengaro@gmail.com",hc:"2026-03-30",cs:"2026-03-30",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"PAID_SEARCH"},
+    {s:"S4",em:"montgomerydjameson@gmail.com",hc:"2021-07-06",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"dm@medsumlabs.com",hc:"2021-11-11",cs:"2026-03-30",at:"RETARGETING",hj:true,ta:1200,cw:0,uc:1200,os:"OFFLINE"},
+    {s:"S4",em:"swojnicki@gmail.com",hc:"2021-07-06",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"easton@agave.live",hc:"2026-03-30",cs:"2026-03-30",at:"NEW",hj:true,ta:450,cw:0,uc:450,os:"PAID_SEARCH"},
+    {s:"S4",em:"lisa@reasontax.com",hc:"2025-02-28",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"jennegan@gmail.com",hc:"2025-03-12",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"rhettwilliams@me.com",hc:"2026-03-30",cs:"2026-03-30",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"its.rachel.nina@gmail.com",hc:"2021-07-06",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"viktor.sobiecki@gmail.com",hc:"2026-03-30",cs:"2026-03-30",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S4",em:"southwaite@google.com",hc:"2024-04-05",cs:"2026-03-30",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S4",em:"chrisburrell@gmail.com",hc:"2023-02-16",cs:"2026-03-30",at:"RETARGETING",hj:true,ta:360,cw:360,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"osteojustin@gmail.com",hc:"2026-03-24",cs:"2026-03-31",at:"NEW",hj:true,ta:140,cw:140,uc:0,os:"OFFLINE"},
+    {s:"S4",em:"k_yeick@yahoo.com",hc:"2026-04-01",cs:"2026-03-31",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"}
+  ],
+  sum:{tc:242,tj:71,nv:80,rt:162,cw:17000.5,uc:42993.01,tot:59993.51,
+    bw:{S1:{l:"W1 (Mar 1–8)",c:65,j:13,nv:17,rt:48,cw:3725,uc:8069,t:11794},S2:{l:"W2 (Mar 9–15)",c:49,j:14,nv:12,rt:37,cw:3430,uc:6400,t:9830},S3:{l:"W3 (Mar 16–22)",c:57,j:17,nv:19,rt:38,cw:7318,uc:3685,t:11003},S4:{l:"W4 (Mar 23–29)",c:71,j:27,nv:32,rt:39,cw:2527.5,uc:24839.01,t:27366.51}}}
+}
+];
+
+const APRIL_CAMPS = [
+{
+  id:"meta", name:"Meta B2C", utm:"GKT-BOFU-META-CV-US-B2C-AON", cls:"cb-meta",
+  contacts:[
+    {s:"S1",em:"jamistewart2023@gmail.com",hc:"2026-04-01",cs:"2026-04-01",at:"NEW",hj:true,ta:980,cw:0,uc:980,os:"PAID_SOCIAL"},
+    {s:"S1",em:"djffrs6@gmail.com",hc:"2026-04-01",cs:"2026-04-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"},
+    {s:"S1",em:"lboillard196054@gmail.com",hc:"2026-03-31",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"},
+    {s:"S1",em:"lbojr394@gmail.com",hc:"2026-04-03",cs:"2026-04-02",at:"NEW",hj:true,ta:680,cw:0,uc:680,os:"PAID_SOCIAL"},
+    {s:"S1",em:"ftoddricus69@gmail.com",hc:"2026-03-19",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SOCIAL"},
+    {s:"S1",em:"cy6582631@gmail.com",hc:"2026-04-05",cs:"2026-04-05",at:"NEW",hj:true,ta:2230,cw:0,uc:2230,os:"OFFLINE"}
+  ],
+  sum:{tc:6,tj:3,nv:4,rt:2,cw:0,uc:3890,tot:3890,
+    bw:{S1:{l:"W1 (Apr 1–5)",c:6,j:3,nv:4,rt:2,cw:0,uc:3890,t:3890},S2:{l:"W2 (Apr 6–12)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S3:{l:"W3 (Apr 13–19)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S4:{l:"W4 (Apr 20–30)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0}}}
+},
+{
+  id:"dg", name:"Google DG B2C", utm:"GKT-BOFU-GG-CV-US-B2C-DG-AON", cls:"cb-dg",
+  contacts:[],
+  sum:{tc:0,tj:0,nv:0,rt:0,cw:0,uc:0,tot:0,
+    bw:{S1:{l:"W1 (Apr 1–5)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S2:{l:"W2 (Apr 6–12)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S3:{l:"W3 (Apr 13–19)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S4:{l:"W4 (Apr 20–30)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0}}}
+},
+{
+  id:"sem", name:"Google Sembrand B2B", utm:"GKT-BOFU-GG-CV-US-B2B-sembrand-AON", cls:"cb-sem",
+  contacts:[
+    {s:"S1",em:"shayla@pfl.com",hc:"2023-04-13",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"danieldecoste@gmail.com",hc:"2021-07-06",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"msdianelacroix@gmail.com",hc:"2026-03-04",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"chrisjbakke@gmail.com",hc:"2025-03-20",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"travisfranklin@gmail.com",hc:"2026-02-26",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"emilycleech@gmail.com",hc:"2021-07-06",cs:"2026-04-01",at:"RETARGETING",hj:true,ta:250,cw:0,uc:250,os:"OFFLINE"},
+    {s:"S1",em:"bmundy80@msn.com",hc:"2026-04-01",cs:"2026-04-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"aleena.saldana98@gmail.com",hc:"2026-04-01",cs:"2026-04-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"chaselrichman@gmail.com",hc:"2026-03-16",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"ndahlen44@gmail.com",hc:"2021-07-06",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"v4k2drz6vp@privaterelay.appleid.com",hc:"2026-04-01",cs:"2026-04-01",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"chelsey.baysinger@workiva.com",hc:"2025-03-09",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"mat.davis@gmail.com",hc:"2024-03-24",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"ORGANIC_SEARCH"},
+    {s:"S1",em:"franco.woolfe@gmail.com",hc:"2026-03-09",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"savoyfinances@gmail.com",hc:"2026-04-02",cs:"2026-04-01",at:"NEW",hj:true,ta:1650,cw:0,uc:1650,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"swojnicki@gmail.com",hc:"2021-07-06",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"gutierrez.j2412@gmail.com",hc:"2021-07-06",cs:"2026-04-01",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"carliestipe@gmail.com",hc:"2026-04-02",cs:"2026-04-01",at:"NEW",hj:true,ta:250,cw:250,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"weixiao1984@gmail.com",hc:"2021-07-06",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"jonathan.argent@gmail.com",hc:"2021-07-06",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"sebas.mg93@gmail.com",hc:"2021-07-06",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"jeffreymontez01@gmail.com",hc:"2023-03-20",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"gaolingyunabc@gmail.com",hc:"2021-07-06",cs:"2026-04-02",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"stacywaller@me.com",hc:"2021-07-06",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"shawn@gxpgrp.com",hc:"2021-07-06",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"hz2017210043@gmail.com",hc:"2026-04-03",cs:"2026-04-03",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"mcintosh.tim3@gmail.com",hc:"2026-04-03",cs:"2026-04-03",at:"NEW",hj:true,ta:250,cw:0,uc:250,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"eric.g@hey.com",hc:"2021-07-06",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"jd@jeremydeputat.com",hc:"2025-09-15",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"shelby@forprivateclients.com",hc:"2026-02-06",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"candace.melendrez@gmail.com",hc:"2021-07-07",cs:"2026-04-03",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"cory.mosley@gmail.com",hc:"2022-01-16",cs:"2026-04-03",at:"RETARGETING",hj:true,ta:1850,cw:0,uc:1850,os:"OFFLINE"},
+    {s:"S1",em:"itsmikeschneider@gmail.com",hc:"2026-04-04",cs:"2026-04-04",at:"NEW",hj:true,ta:430,cw:0,uc:430,os:"PAID_SEARCH"},
+    {s:"S1",em:"michellebarrera974@gmail.com",hc:"2023-01-19",cs:"2026-04-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"y7jy62zf8s@privaterelay.appleid.com",hc:"2026-04-04",cs:"2026-04-04",at:"NEW",hj:true,ta:3200,cw:3200,uc:0,os:"PAID_SEARCH"},
+    {s:"S1",em:"tichikawa@yahoo.com",hc:"2025-06-05",cs:"2026-04-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"stephen.thomson@olarry.com",hc:"2026-04-04",cs:"2026-04-04",at:"NEW",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"prenwickwhs@gmail.com",hc:"2026-03-20",cs:"2026-04-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"marissawilson161@gmail.com",hc:"2025-04-12",cs:"2026-04-04",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"jen@jenedmon.com",hc:"2025-05-29",cs:"2026-04-04",at:"RETARGETING",hj:true,ta:250,cw:250,uc:0,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"evamped@gmail.com",hc:"2026-04-05",cs:"2026-04-05",at:"NEW",hj:true,ta:350,cw:0,uc:350,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"t.gideonse@gmail.com",hc:"2026-03-18",cs:"2026-04-05",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"OFFLINE"},
+    {s:"S1",em:"arianna1.urquia@gmail.com",hc:"2026-04-05",cs:"2026-04-05",at:"NEW",hj:true,ta:350,cw:0,uc:350,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"kendallcdrake@gmail.com",hc:"2026-04-05",cs:"2026-04-05",at:"NEW",hj:true,ta:1650,cw:0,uc:1650,os:"DIRECT_TRAFFIC"},
+    {s:"S1",em:"crispybrooks@gmail.com",hc:"2025-04-06",cs:"2026-04-05",at:"RETARGETING",hj:false,ta:0,cw:0,uc:0,os:"DIRECT_TRAFFIC"}
+  ],
+  sum:{tc:45,tj:11,nv:13,rt:32,cw:3700,uc:6780,tot:10480,
+    bw:{S1:{l:"W1 (Apr 1–5)",c:45,j:11,nv:13,rt:32,cw:3700,uc:6780,t:10480},S2:{l:"W2 (Apr 6–12)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S3:{l:"W3 (Apr 13–19)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0},S4:{l:"W4 (Apr 20–30)",c:0,j:0,nv:0,rt:0,cw:0,uc:0,t:0}}}
+}
+];
+
+let ACTIVE_CAMPS = CAMPS;
+
+// ─── HELPERS ────────────────────────────────────────────
+const fmt = v => v===0?'$0':'$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+let wlbl = {'S1':'Mar 1–8','S2':'Mar 9–15','S3':'Mar 16–22','S4':'Mar 23–29'};
+let wlblEn = {'S1':'W1 (Mar 1–8)','S2':'W2 (Mar 9–15)','S3':'W3 (Mar 16–22)','S4':'W4 (Mar 23–29)'};
+
+function getOS(cid,c){
+  if(c&&c.os) return c.os;
+  if(cid==='meta') return 'PAID_SOCIAL';
+  return 'PAID_SEARCH';
+}
+function osBadge(src){
+  const d={
+    PAID_SEARCH:['#dbeafe','#1e40af','🔍 Paid Search'],
+    PAID_SOCIAL:['#fce7f3','#9d174d','📱 Paid Social'],
+    ORGANIC_SEARCH:['#dcfce7','#166534','🌿 Organic Search'],
+    DIRECT_TRAFFIC:['#f3f4f6','#374151','🔗 Direct Traffic'],
+    OFFLINE:['#fef3c7','#92400e','📋 Offline / SF'],
+    REFERRALS:['#ede9fe','#5b21b6','🤝 Referral'],
+    AI_REFERRALS:['#e0f2fe','#0c4a6e','🤖 AI Referral'],
+    UNKNOWN:['#f3f4f6','#9ca3af','❓ Unknown']
+  };
+  const [bg,col,lbl]=d[src]||['#f3f4f6','#6b7280',src];
+  return `<span class="b" style="background:${bg};color:${col}">${lbl}</span>`;
+}
+// Sign-Up / Interaction display logic
+function csDisplay(c){
+  if(c.cs) return '<span style="color:#374151">'+c.cs+'</span>';
+  if(c.hc && c.hc.startsWith('2026-03')) return c.hc+'<span style="font-size:9px;color:#94a3b8;margin-left:3px">(HS)</span>';
+  // Retargeting / pre-March contact: approximate date = start of interaction week
+  const wkStart={S1:'2026-03-01',S2:'2026-03-09',S3:'2026-03-16',S4:'2026-03-23'};
+  return '<span style="color:#94a3b8" title="Approx. date (start of interaction week from HubSpot)">~'+wkStart[c.s]+'</span>';
+}
+function atBadge(a){
+  if(a==='Nuevo'||a==='NEW') return '<span class="b b-nv">🟢 New</span>';
+  if(a==='Retargeting'||a==='RETARGETING') return '<span class="b b-rt">🔵 Retargeting</span>';
+  return '<span class="b b-sv">⬜ Unverified</span>';
+}
+function dealBadge(deals){
+  if(!deals||!deals.length) return '<span class="b b-nj">No Job</span>';
+  return deals.map(d=>{
+    if(d.st==='CW') return `<span class="b b-cw">✅ CW ${fmt(d.am)}</span>`;
+    if(d.st==='UC') return `<span class="b b-uc">🔨 UC ${fmt(d.am)}</span>`;
+    if(d.st==='CC') return `<span class="b b-cc">✅ Closed/Cust ${fmt(d.am)}</span>`;
+    if(d.st==='RN') return `<span class="b b-rn">🔄 ${d.lb}</span>`;
+    if(d.st==='WN') return `<span class="b b-wn">${d.lb}</span>`;
+    return `<span class="b b-sv">${d.lb}</span>`;
+  }).join('<br>');
+}
+function nm(c){ return (c.fn||'')+(c.ln?' '+c.ln:'') || c.em.split('@')[0]; }
+
+// ─── FILTER STATE ───────────────────────────────────────
+let fW='',fC='',fA='',fJ='';
+function applyF(){fW=fw.value;fC=fc.value;fA=fa.value;fJ=fj.value;render();}
+function matches(c,cid){
+  if(fC&&fC!==cid) return false;
+  if(fW&&c.s!==fW) return false;
+  if(fA&&c.at!==fA) return false;
+  if(fJ==='1'&&!c.hj) return false;
+  if(fJ==='0'&&c.hj) return false;
+  return true;
+}
+
+// ─── RENDER ─────────────────────────────────────────────
+function render(){
+  const camps = fC ? ACTIVE_CAMPS.filter(c=>c.id===fC) : ACTIVE_CAMPS;
+  renderGT(camps);
+  renderKPIs(camps);
+  renderSrcSummary(camps);
+  renderPieCharts(camps);
+  renderCamps(camps);
+}
+
+function renderSrcSummary(camps){
+  const OS_META={
+    PAID_SEARCH:  {lbl:'🔍 Paid Search',   bg:'#dbeafe',col:'#1e40af',bar:'#3b82f6'},
+    PAID_SOCIAL:  {lbl:'📱 Paid Social',   bg:'#fce7f3',col:'#9d174d',bar:'#ec4899'},
+    ORGANIC_SEARCH:{lbl:'🌿 Organic Search',bg:'#dcfce7',col:'#166534',bar:'#22c55e'},
+    DIRECT_TRAFFIC:{lbl:'🔗 Direct Traffic',bg:'#f3f4f6',col:'#374151',bar:'#9ca3af'},
+    OFFLINE:      {lbl:'📋 Offline / SF',  bg:'#fef3c7',col:'#92400e',bar:'#f59e0b'},
+    REFERRALS:    {lbl:'🤝 Referral',      bg:'#ede9fe',col:'#5b21b6',bar:'#8b5cf6'},
+    AI_REFERRALS: {lbl:'🤖 AI Referral',   bg:'#e0f2fe',col:'#0c4a6e',bar:'#06b6d4'},
+    UNKNOWN:      {lbl:'❓ Unknown',       bg:'#f3f4f6',col:'#9ca3af',bar:'#d1d5db'}
+  };
+  // Aggregate by source
+  const agg={};
+  camps.forEach(cp=>{
+    cp.contacts.filter(c=>matches(c,cp.id)).forEach(c=>{
+      const src=getOS(cp.id,c);
+      if(!agg[src]) agg[src]={contacts:0,withJob:0,total:0};
+      agg[src].contacts++;
+      if(c.hj) agg[src].withJob++;
+      agg[src].total+=c.ta;
+    });
+  });
+  const totalContacts=Object.values(agg).reduce((s,v)=>s+v.contacts,0);
+  if(totalContacts===0){document.getElementById('src-summary').innerHTML='';return;}
+  // Sort by contacts desc
+  const sorted=Object.entries(agg).sort((a,b)=>b[1].contacts-a[1].contacts);
+  const rows=sorted.map(([src,v])=>{
+    const m=OS_META[src]||{lbl:src,bg:'#f3f4f6',col:'#6b7280',bar:'#9ca3af'};
+    const pct=Math.round(v.contacts/totalContacts*100);
+    const conv=v.contacts?Math.round(v.withJob/v.contacts*100):0;
+    return `<div class="src-row">
+      <div class="src-lbl"><span class="b" style="background:${m.bg};color:${m.col};margin-bottom:5px">${m.lbl}</span>
+        <div class="src-bar-wrap"><div class="src-bar" style="width:${pct}%;background:${m.bar}"></div></div>
+      </div>
+      <div class="src-stat">
+        <strong>${v.contacts}</strong>
+        <span class="src-sub">${pct}% · ${conv}% conv.</span>
+        ${v.total>0?`<span class="src-sub" style="color:#0f172a;font-weight:600">${fmt(v.total)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('src-summary').innerHTML=`
+    <div class="src-card">
+      <h3>📡 Original Source Breakdown — ${totalContacts} contacts</h3>
+      <div class="src-grid">${rows}</div>
+      <div style="margin-top:14px;padding:12px 14px;background:#f0f9ff;border-left:3px solid #3b82f6;border-radius:6px;font-size:11px;color:#374151;line-height:1.6">
+        <strong>📌 Attribution vs. Origin Methodology Note</strong><br>
+        <em>Original Source</em> refers to how we <strong>first acquired</strong> the contact (Attraction — e.g., the channel that brought them to Taxfyle originally).
+        <em>Conversion Source</em> reflects the channel that <strong>drove the final sign-up</strong> (Action — e.g., the paid campaign they interacted with in March).
+        For example, a contact originally acquired <strong>Offline</strong> (Salesforce import) might finally convert via a <strong>Paid Media</strong> ad — this is the core Retargeting pattern captured in Sembrand B2B.
+      </div>
+    </div>`;
+}
+
+function renderGT(camps){
+  let tc=0,tj=0,cw=0,uc=0,tt=0;
+  camps.forEach(cp=>{
+    const flt=cp.contacts.filter(c=>matches(c,cp.id));
+    tc+=flt.length; tj+=flt.filter(c=>c.hj).length;
+    flt.forEach(c=>{const dl=c.deals||[]; cw+=(c.cw!=null&&!dl.length)?c.cw:dl.filter(d=>d.st==='CW'&&d.tf).reduce((s,d)=>s+d.am,0); uc+=(c.uc!=null&&!dl.length)?c.uc:dl.filter(d=>(d.st==='UC'||d.st==='CC')&&d.tf).reduce((s,d)=>s+d.am,0); tt+=c.ta;});
+  });
+  document.getElementById('gt').innerHTML=`
+    <div class="gt-item"><div class="gt-lbl">Total Sign-ups</div><div class="gt-val">${tc}</div></div>
+    <div class="gt-div"></div>
+    <div class="gt-item"><div class="gt-lbl">Jobs Created</div><div class="gt-val">${tj} <span style="font-size:12px;color:#64748b">(${tc?Math.round(tj/tc*100):0}%)</span></div></div>
+    <div class="gt-div"></div>
+    <div class="gt-item"><div class="gt-lbl">Closed Won</div><div class="gt-val cw">${fmt(cw)}</div></div>
+    <div class="gt-div"></div>
+    <div class="gt-item"><div class="gt-lbl">Under Construction</div><div class="gt-val uc">${fmt(uc)}</div></div>
+    <div class="gt-div"></div>
+    <div class="gt-item"><div class="gt-lbl">Total Pipeline Value</div><div class="gt-val tot">${fmt(tt)}</div></div>`;
+}
+
+function renderKPIs(camps){
+  document.getElementById('kpis').innerHTML = camps.map(cp=>{
+    const flt=cp.contacts.filter(c=>matches(c,cp.id));
+    const tj=flt.filter(c=>c.hj).length;
+    const nv=flt.filter(c=>c.at==='Nuevo'||c.at==='NEW').length;
+    const rt=flt.filter(c=>c.at==='Retargeting'||c.at==='RETARGETING').length;
+    let cw=0,uc=0,tt=0;
+    flt.forEach(c=>{const dl=c.deals||[]; cw+=(c.cw!=null&&!dl.length)?c.cw:dl.filter(d=>d.st==='CW'&&d.tf).reduce((s,d)=>s+d.am,0); uc+=(c.uc!=null&&!dl.length)?c.uc:dl.filter(d=>(d.st==='UC'||d.st==='CC')&&d.tf).reduce((s,d)=>s+d.am,0); tt+=c.ta;});
+    return `<div style="margin-bottom:14px">
+      <span class="cb ${cp.cls}">● ${cp.name}</span>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-lbl">Sign-ups</div><div class="kpi-val">${flt.length}</div><div class="kpi-sub">${nv} new · ${rt} retargeting</div></div>
+        <div class="kpi g"><div class="kpi-lbl">Jobs Created</div><div class="kpi-val">${tj}</div><div class="kpi-sub">${flt.length?Math.round(tj/flt.length*100):0}% conversion rate</div></div>
+        <div class="kpi o"><div class="kpi-lbl">Closed Won</div><div class="kpi-val">${fmt(cw)}</div></div>
+        <div class="kpi b"><div class="kpi-lbl">Under Construction</div><div class="kpi-val">${fmt(uc)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Total Taxfyle</div><div class="kpi-val">${fmt(tt)}</div></div>
+      </div></div>`;
+  }).join('');
+}
+
+function renderCamps(camps){
+  document.getElementById('camps').innerHTML = camps.map(cp=>{
+    const flt=cp.contacts.filter(c=>matches(c,cp.id));
+    const rows = flt.length===0
+      ? `<tr class="empty"><td colspan="9">No contacts match the applied filters.</td></tr>`
+      : flt.map((c,idx)=>`<tr>
+          <td><strong>${wlblEn[c.s]||c.s}</strong></td>
+          <td class="nc"><strong style="color:#64748b;font-family:monospace">C-${String(idx+1).padStart(3,'0')}</strong>${c.nt?`<span class="nt">⚠ ${c.nt}</span>`:''}</td>
+          <td style="font-size:11px;color:#64748b">${c.hc}</td>
+          <td style="font-size:11px">${csDisplay(c)}</td>
+          <td>${osBadge(getOS(cp.id,c))}</td>
+          <td>${atBadge(c.at)}</td>
+          <td style="text-align:center">${c.hj?'<span class="check">✅</span>':'<span class="cross">❌</span>'}</td>
+          <td>${c.deals?dealBadge(c.deals):(c.cw>0&&c.uc>0)?`<span class="b b-cw">✅ Closed Won</span> <span class="b b-uc">🔨 UC</span>`:c.cw>0?`<span class="b b-cw">✅ Closed Won</span>`:c.uc>0?`<span class="b b-uc">🔨 Under Constr.</span>`:c.hj?`<span class="b" style="background:#f3f4f6;color:#9ca3af">Sin revenue</span>`:'—'}</td>
+          <td class="amt">${c.deals?(c.ta>0?fmt(c.ta):'—'):(c.cw>0&&c.uc>0)?`<span class="amt cw">${fmt(c.cw)}</span> <span style="color:#94a3b8;font-size:10px">+UC</span> <span class="amt uc">${fmt(c.uc)}</span>`:c.cw>0?`<span class="amt cw">${fmt(c.cw)}</span>`:c.uc>0?`<span class="amt uc">${fmt(c.uc)}</span>`:'—'}</td>
+        </tr>`).join('');
+
+    // summary table (always full, not filtered)
+    const wks=['S1','S2','S3','S4'];
+    let tC=0,tJ=0,tCW=0,tUC=0,tT=0,tNV=0,tRT=0;
+    const sRows=wks.map(w=>{
+      const d=cp.sum.bw[w];
+      tC+=d.c;tJ+=d.j;tCW+=d.cw;tUC+=d.uc;tT+=d.t;tNV+=(d.nv||0);tRT+=(d.rt||0);
+      return `<tr>
+        <td><strong>${d.l}</strong></td>
+        <td>${d.c}</td><td>${d.j}</td>
+        <td>${(d.nv||0)} / ${(d.rt||0)}</td>
+        <td class="amt cw">${d.cw>0?fmt(d.cw):'—'}</td>
+        <td class="amt uc">${d.uc>0?fmt(d.uc):'—'}</td>
+        <td class="amt tot">${d.t>0?fmt(d.t):'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="cc">
+      <div class="ch">
+        <div><h3><span class="cb ${cp.cls}" style="margin-right:6px">● ${cp.name}</span></h3><div class="utm">${cp.utm}</div></div>
+        <span style="font-size:11px;color:#64748b">${flt.length} contact${flt.length!==1?'s':''} shown</span>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>Week</th><th>Contact ID</th><th>HS Created</th><th>Sign-Up / Interaction</th><th>Original Source</th><th>Attribution</th><th>Job</th><th>Deal Status</th><th>Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="sw">
+        <h4>Weekly Summary — ${cp.name}</h4>
+        <table class="stbl">
+          <thead><tr><th>Week</th><th>Sign-ups</th><th>Jobs Created</th><th>New / Retarg.</th><th>Closed Won</th><th>Under Construction</th><th>Total Pipeline</th></tr></thead>
+          <tbody>${sRows}
+            <tr class="tot-row"><td>TOTAL</td><td>${tC}</td><td>${tJ}</td><td>${tNV} / ${tRT}</td><td class="amt cw">${tCW>0?fmt(tCW):'—'}</td><td class="amt uc">${tUC>0?fmt(tUC):'—'}</td><td class="amt tot">${fmt(tT)}</td></tr>
+          </tbody>
+        </table>
+        ${cp.id==='sem'?`<div style="font-size:10px;color:#94a3b8;margin-top:8px">⚠️ Renewals and pre-March deals for Retargeting contacts are NOT counted in campaign total. | Deals in other pipelines excluded.</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── PIE CHARTS ──────────────────────────────────────────
+const _pieCharts={};
+function renderPieCharts(camps){
+  const OS_COLORS={
+    PAID_SEARCH:'#3b82f6',PAID_SOCIAL:'#ec4899',ORGANIC_SEARCH:'#22c55e',
+    DIRECT_TRAFFIC:'#9ca3af',OFFLINE:'#f59e0b',REFERRALS:'#8b5cf6',
+    AI_REFERRALS:'#06b6d4',UNKNOWN:'#d1d5db'
+  };
+  const OS_LABELS={
+    PAID_SEARCH:'Paid Search',PAID_SOCIAL:'Paid Social',ORGANIC_SEARCH:'Organic Search',
+    DIRECT_TRAFFIC:'Direct Traffic',OFFLINE:'Offline / SF',REFERRALS:'Referral',
+    AI_REFERRALS:'AI Referral',UNKNOWN:'Unknown'
+  };
+  const displayCamps = fC ? ACTIVE_CAMPS.filter(c=>c.id===fC) : ACTIVE_CAMPS;
+  const html=displayCamps.map(cp=>{
+    const agg={};
+    cp.contacts.forEach(c=>{
+      const src=getOS(cp.id,c);
+      if(!agg[src]) agg[src]={total:0,withJob:0};
+      agg[src].total++;
+      if(c.hj) agg[src].withJob++;
+    });
+    return `<div style="background:#fff;border-radius:11px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:18px 22px;display:flex;flex-direction:column;align-items:center">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:4px">Original Source Mix</div>
+      <span class="cb ${cp.cls}" style="margin-bottom:10px">● ${cp.name}</span>
+      <canvas id="pie_${cp.id}" width="200" height="200"></canvas>
+      <div id="pie_leg_${cp.id}" style="margin-top:10px;font-size:10px;color:#374151;width:100%"></div>
+    </div>`;
+  }).join('');
+  document.getElementById('pie-section').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px">${html}</div>`;
+
+  // Destroy old chart instances
+  Object.keys(_pieCharts).forEach(k=>{if(_pieCharts[k]){_pieCharts[k].destroy();delete _pieCharts[k];}});
+
+  // Build charts after DOM render
+  requestAnimationFrame(()=>{
+    displayCamps.forEach(cp=>{
+      const agg={};
+      cp.contacts.forEach(c=>{
+        const src=getOS(cp.id,c);
+        if(!agg[src]) agg[src]={total:0,withJob:0};
+        agg[src].total++;
+        if(c.hj) agg[src].withJob++;
+      });
+      const sorted=Object.entries(agg).sort((a,b)=>b[1].total-a[1].total);
+      const labels=sorted.map(([k])=>OS_LABELS[k]||k);
+      const data=sorted.map(([,v])=>v.total);
+      const colors=sorted.map(([k])=>OS_COLORS[k]||'#ccc');
+      const total=data.reduce((s,v)=>s+v,0);
+      const ctx=document.getElementById('pie_'+cp.id);
+      if(!ctx) return;
+      _pieCharts[cp.id]=new Chart(ctx,{
+        type:'doughnut',
+        data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
+        options:{cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>{const pct=Math.round(item.raw/total*100);return ` ${item.label}: ${item.raw} (${pct}%)`;}}}}}
+      });
+      // Legend
+      const leg=document.getElementById('pie_leg_'+cp.id);
+      if(leg) leg.innerHTML=sorted.map(([k,v])=>{
+        const pct=Math.round(v.total/total*100);
+        const conv=Math.round(v.withJob/v.total*100);
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="width:10px;height:10px;border-radius:50%;background:${OS_COLORS[k]||'#ccc'};flex-shrink:0"></span>
+          <span style="flex:1">${OS_LABELS[k]||k}</span>
+          <span style="font-weight:700">${v.total}</span>
+          <span style="color:#94a3b8">${pct}%</span>
+          <span style="color:#22c55e;font-weight:600">${conv}% ✓</span>
+        </div>`;
+      }).join('');
+    });
+  });
+}
+
+const WEEK_OPTS = {
+  '03':[{v:'S1',l:'W1 (Mar 1–8)'},{v:'S2',l:'W2 (Mar 9–15)'},{v:'S3',l:'W3 (Mar 16–22)'},{v:'S4',l:'W4 (Mar 23–31)'}],
+  '04':[{v:'S1',l:'W1 (Apr 1–5)'},{v:'S2',l:'W2 (Apr 6–12)'},{v:'S3',l:'W3 (Apr 13–19)'},{v:'S4',l:'W4 (Apr 20–30)'}]
+};
+const WLBL_MAP = {
+  '03':{'S1':'Mar 1–8','S2':'Mar 9–15','S3':'Mar 16–22','S4':'Mar 23–31'},
+  '04':{'S1':'Apr 1–5','S2':'Apr 6–12','S3':'Apr 13–19','S4':'Apr 20–30'}
+};
+const WLBLEN_MAP = {
+  '03':{'S1':'W1 (Mar 1–8)','S2':'W2 (Mar 9–15)','S3':'W3 (Mar 16–22)','S4':'W4 (Mar 23–31)'},
+  '04':{'S1':'W1 (Apr 1–5)','S2':'W2 (Apr 6–12)','S3':'W3 (Apr 13–19)','S4':'W4 (Apr 20–30)'}
+};
+const MONTH_META = {
+  '03':{sub:'March 2026 · Final (Closed) · PostHog × HubSpot'},
+  '04':{sub:'April 2026 · Live · As of Apr 5 (Day 5/30) · PostHog × HubSpot'}
+};
+function chMonth(){
+  const v=document.getElementById('msel').value;
+  if(v==='03'){ ACTIVE_CAMPS=CAMPS; }
+  else if(v==='04'){ ACTIVE_CAMPS=APRIL_CAMPS; }
+  else { alert('Data is only available for March 2026 and April 2026 (Apr 1–5).'); document.getElementById('msel').value='03'; return; }
+  // Update week filter options
+  const fw=document.getElementById('fw');
+  const wopts=WEEK_OPTS[v]||WEEK_OPTS['03'];
+  fw.innerHTML='<option value="">All</option>'+wopts.map(o=>`<option value="${o.v}">${o.l}</option>`).join('');
+  fw.value=''; fW=''; fC=''; fA=''; fJ='';
+  // Reset other filters
+  ['fc','fa','fj'].forEach(id=>{document.getElementById(id).value='';});
+  // Update week label maps
+  wlbl=WLBL_MAP[v]||WLBL_MAP['03'];
+  wlblEn=WLBLEN_MAP[v]||WLBLEN_MAP['03'];
+  // Update subtitle
+  const meta=MONTH_META[v]||MONTH_META['03'];
+  document.getElementById('subtitle').innerHTML=meta.sub+' · <span style="color:#4ade80;font-weight:600">CONFIDENTIAL — GKT Team</span>';
+  render();
+}
+
+// ─── INIT ────────────────────────────────────────────────
+const fw=document.getElementById('fw'),fc=document.getElementById('fc'),fa=document.getElementById('fa'),fj=document.getElementById('fj');
+render();
+</script>
+</body>
+</html>
