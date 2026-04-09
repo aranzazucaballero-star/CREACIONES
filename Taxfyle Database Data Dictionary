@@ -1,0 +1,645 @@
+# Taxfyle Database Data Dictionary
+
+## Overview
+
+This document describes the structure and logic of the Taxfyle database for use in building the daily sales dashboard. The database contains job-level data that complements HubSpot data for comprehensive reporting.
+
+---
+
+## Database Connection (Metabase/BigQuery)
+
+| Parameter | Value |
+|-----------|-------|
+| **Table** | `dbt_models.fct_jobs` |
+| **Database** | BigQuery |
+| **Timezone** | America/New_York (Miami) |
+
+### BigQuery Date/Time Syntax
+
+Always convert timestamps to Miami timezone for analysis:
+
+```sql
+-- Convert timestamp to Miami timezone
+DATETIME(date_first_submitted, 'America/New_York')
+
+-- Get current timestamp in Miami timezone
+DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')
+
+-- Extract just the date
+DATE(DATETIME(date_first_submitted, 'America/New_York'))
+
+-- Extract hour (for hourly analysis)
+EXTRACT(HOUR FROM DATETIME(date_first_submitted, 'America/New_York'))
+
+-- Extract day of year (for YoY comparisons)
+EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York'))
+
+-- Same day last year
+DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 YEAR)
+```
+
+---
+
+## Data Scope & Filters
+
+### Required Filters for Dashboard
+
+| Filter | Value | Reason |
+|--------|-------|--------|
+| `type` | `TAX` | Only include tax filing jobs (excludes other job types) |
+| `workspace_class` | `B2C` or `B2B2C` | Exclude B2B partners (CPA firms) |
+| `date_first_submitted` | `>= 2026-01-19` | Season start date |
+
+### Excluded from Dashboard
+
+- **B2B partners**: HeimLantz CPAs & Advisors, NSF Management, Lumsden & McCormick, etc.
+- **Non-TAX job types**: Any `type` value other than `TAX`
+
+---
+
+## Partner Reference (Workspace Mapping)
+
+Use `workspace_id` as the primary identifier. The `workspace_name` field may have inconsistent values.
+
+### Point-of-Sale (POS) Partners
+
+These are partners where Taxfyle handles the sales process (call center support).
+
+| Workspace ID | Display Name | Class | Call Center |
+|--------------|--------------|-------|-------------|
+| 1 | Taxfyle B2C | B2C | Sales Factory |
+| 323 | Rocket Lawyer | B2B2C | Sales Factory |
+| 595 | Empower | B2B2C | Internal |
+| 1738 | Vensure | B2B2C | TBD |
+| 1742 | Pinnacle Employee Services | B2B2C | TBD |
+| 1744 | Berkshire MM | B2B2C | TBD |
+
+**POS Filter:**
+```sql
+workspace_id IN (1, 323, 595, 1738, 1742, 1744)
+```
+
+### Workspace Name Normalization
+
+Some workspaces have inconsistent naming. Use this CASE statement:
+
+```sql
+CASE
+    WHEN workspace_id = 323 THEN 'Rocket Lawyer'
+    ELSE workspace_name
+END as partner_name
+```
+
+| Workspace ID | Possible Names in Data | Normalized Name |
+|--------------|------------------------|-----------------|
+| 323 | "Rocket Lawyer", "Rocket Tax" | Rocket Lawyer |
+
+### Other B2B2C Partners (Self-Onboard Only)
+
+These partners appear in the data but do NOT have call center support (self-onboard only):
+- Collective
+- Heard
+- Creekmur Wealth Advisors
+- Advisor.com
+- Trinity Tax Advisors
+
+### Filter Patterns
+
+| Use Case | Filter |
+|----------|--------|
+| All consumer (exclude B2B) | `workspace_class IN ('B2C', 'B2B2C')` |
+| POS partners only | `workspace_id IN (1, 323, 595, 1738, 1742, 1744)` |
+| Self-onboard only partners | `workspace_class IN ('B2C', 'B2B2C') AND workspace_id NOT IN (1, 323, 595, 1738, 1742, 1744)` |
+
+---
+
+## Job Status Lifecycle
+
+```
+UNDER_CONSTRUCTION → INFO_GATHERING → UNCLAIMED → CLAIMED → [ON_HOLD/IDLE] → CLOSED
+```
+
+| Status | Description | Payment State |
+|--------|-------------|---------------|
+| `UNDER_CONSTRUCTION` | Customer answering intake questions | **Not paid** |
+| `INFO_GATHERING` | Customer uploading documents for Tax Pro | Paid |
+| `UNCLAIMED` | Job in queue, waiting for Tax Pro to claim | Paid |
+| `CLAIMED` | Tax Pro has picked up the job | Paid |
+| `ON_HOLD` | Job paused (various reasons) | Paid |
+| `IDLE` | Job inactive | Paid |
+| `CLOSED` | Job completed | Paid (full amount) |
+
+### Key Insight: Payment Indicator
+
+**Any status other than `UNDER_CONSTRUCTION` means the customer has paid.**
+
+---
+
+## Payment Structure
+
+| Field | Description |
+|-------|-------------|
+| `total` | Full job price (what the customer will pay in total) |
+| `paid_amount` | Amount collected so far (typically 50% at submission) |
+| `coupon_amount` | Discount applied |
+| `provider_cut_amount` | Amount allocated to the Tax Pro |
+
+### Payment Timeline
+
+1. **At submission**: 50% of `total` is charged → populates `paid_amount`
+2. **At close**: Remaining 50% is charged → `paid_amount` equals `total`
+
+---
+
+## Key Date Fields
+
+| Field | Description | Use For Analysis? |
+|-------|-------------|-------------------|
+| `date_created` | When the job record was created | Yes - "Jobs Created" metric |
+| `date_first_submitted` | When customer first paid/submitted | **Yes - Primary date for sales analysis** |
+| `date_transmitted` | When job entered platform (can change on reopen) | No - use `date_first_submitted` instead |
+| `date_questions_last_completed` | When intake questions were last completed | Yes - for funnel timing |
+| `date_first_claimed` | When a Tax Pro first claimed the job | Yes - for fulfillment metrics |
+| `date_accepted` | When Tax Pro accepted the job | Yes - for fulfillment metrics |
+| `date_closed` | When job was completed | Yes - for completion metrics |
+| `date_modified` | Last modification timestamp | No - use specific date fields |
+
+### Date Format
+
+Dates are stored as **TIMESTAMP** fields in BigQuery. Always convert to Miami timezone for analysis:
+
+```sql
+DATE(DATETIME(date_first_submitted, 'America/New_York'))
+```
+
+---
+
+## Funnel Stage Mapping
+
+### Self-Onboard Funnel (Jobs Object)
+
+| Funnel Stage | Database Filter |
+|--------------|-----------------|
+| **Jobs Created** | `date_created` exists, `type = 'TAX'` |
+| **Questions Completed (Quote Shown)** | `questions_completed = 'true'` AND `status = 'UNDER_CONSTRUCTION'` |
+| **Jobs Submitted (Sale)** | `status != 'UNDER_CONSTRUCTION'` |
+
+### Important Note: Call Center Complexity
+
+For **call center deals**, the `questions_completed` field has different meaning:
+- Call center reps complete questions to generate the quote/payment link
+- After payment, customer must still enter the portal to complete additional questions and upload documents
+- Cart abandonment logic for call center deals is more complex and should be determined from HubSpot data
+
+**Recommendation**: Use HubSpot Deals data for call center pipeline metrics; use database for self-onboard funnel metrics.
+
+---
+
+## Field Reference
+
+### Identifiers
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary job identifier |
+| `short_id` | String | Human-readable job ID (e.g., "LAQM8W7RSXP") |
+| `legend_id` | String | Product/service identifier |
+| `legend_name` | String | Product name (e.g., "Tax Filing Services") |
+
+### Client Information
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `client_name` | String | Customer full name |
+| `client_email` | String | Customer email address |
+| `client_id` | String | Internal client ID (format: `local|UUID` or `auth0|ID`) |
+| `client_user_public_id` | UUID | Public client identifier |
+| `created_by_user_id` | String | User who created the job |
+| `created_by_public_id` | UUID | Public ID of creator |
+
+### Workspace/Partner
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `workspace_id` | String | Partner identifier (use this as primary key) |
+| `workspace_name` | String | Partner display name (may be inconsistent) |
+| `workspace_class` | String | `B2C`, `B2B2C`, or `B2B` |
+
+### Job Details
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | String | Job type (filter for `TAX`) |
+| `status` | String | Current job status |
+| `questions_completed` | String | `"true"` or `"false"` - whether intake questions are done |
+| `description` | String | Job summary (e.g., "2025 \| Form 1040") |
+| `job_specs` | String | Comma-separated list of forms/services |
+| `resolution` | String | How job was resolved (if closed) |
+| `archived_status` | Boolean | `true` or `false` (BOOL type, not string) |
+| `stale` | String | Stale indicator |
+
+### Tax Pro Information
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pro_name` | String | Assigned Tax Pro name |
+| `pro_email` | String | Tax Pro email |
+| `pro_user_id` | String | Tax Pro internal ID |
+| `pro_user_public_id` | UUID | Tax Pro public ID |
+| `requested_pro_id` | String | If customer requested specific pro |
+| `requested_pro_public_id` | UUID | Public ID of requested pro |
+| `pro_rating` | Number | Tax Pro rating (null if not rated) |
+
+### Financial
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total` | FLOAT64 | Full job price (numeric, can use directly in SUM) |
+| `paid_amount` | FLOAT64 | Amount paid so far |
+| `coupon_codes` | String | JSON array of applied coupons |
+| `coupon_amount` | FLOAT64 | Total discount amount |
+| `provider_cut_amount` | FLOAT64 | Tax Pro's portion |
+| `admin_fee_amount` | FLOAT64 | Admin fees (usually null) |
+| `gross_amount` | FLOAT64 | Gross amount (usually null) |
+| `amended_amount` | FLOAT64 | Amendment charges |
+
+### Dates
+
+All date fields are **TIMESTAMP** type. Convert to Miami timezone for analysis.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date_created` | TIMESTAMP | Job creation timestamp |
+| `date_modified` | TIMESTAMP | Last modification |
+| `job_date_modified` | TIMESTAMP | Job-specific modification date |
+| `date_first_submitted` | TIMESTAMP | **First payment/submission date (primary for sales)** |
+| `date_transmitted` | TIMESTAMP | Platform transmission date |
+| `date_questions_last_completed` | TIMESTAMP | Questions completion date |
+| `date_first_claimed` | TIMESTAMP | First Tax Pro claim date |
+| `date_accepted` | TIMESTAMP | Tax Pro acceptance date |
+| `date_first_closed` | TIMESTAMP | First close date |
+| `date_closed` | TIMESTAMP | Current close date |
+| `date_cancelled` | TIMESTAMP | Cancellation date |
+| `date_first_cancelled` | TIMESTAMP | First cancellation date |
+| `date_reopen` | TIMESTAMP | Reopen date |
+| `date_deadline` | TIMESTAMP | Job deadline |
+| `date_start` | TIMESTAMP | Start date |
+
+---
+
+## Sample Queries (BigQuery / Metabase)
+
+### Sales Today (TAX Jobs)
+
+```sql
+SELECT COUNT(*) as sales_today
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_class IN ('B2C', 'B2B2C')
+    AND DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York'))
+```
+
+### Sales Yesterday
+
+```sql
+SELECT COUNT(*) as sales_yesterday
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_class IN ('B2C', 'B2B2C')
+    AND DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 DAY)
+```
+
+### Season to Date (STD) Sales & Revenue
+
+```sql
+SELECT
+    COUNT(*) as sales_std,
+    SUM(total) as revenue_std
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_class IN ('B2C', 'B2B2C')
+    AND DATE(DATETIME(date_first_submitted, 'America/New_York')) >= '2026-01-19'
+```
+
+### Sales by Partner (Today vs Yesterday)
+
+```sql
+SELECT
+    workspace_name as partner_name,
+    SUM(CASE WHEN DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 DAY) THEN 1 ELSE 0 END) as sales_yesterday,
+    SUM(CASE WHEN DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')) THEN 1 ELSE 0 END) as sales_today
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_class IN ('B2C', 'B2B2C')
+    AND DATE(DATETIME(date_first_submitted, 'America/New_York')) >= DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 DAY)
+GROUP BY workspace_name
+ORDER BY sales_yesterday DESC
+```
+
+### Hourly Cumulative (Today vs Yesterday) - Ritmo por Hora
+
+```sql
+SELECT
+    hour_miami,
+    SUM(SUM(CASE WHEN day_flag = 'today' THEN 1 ELSE 0 END)) OVER (ORDER BY hour_miami) as cumulative_today,
+    SUM(SUM(CASE WHEN day_flag = 'yesterday' THEN 1 ELSE 0 END)) OVER (ORDER BY hour_miami) as cumulative_yesterday
+FROM (
+    SELECT
+        EXTRACT(HOUR FROM DATETIME(date_first_submitted, 'America/New_York')) as hour_miami,
+        CASE
+            WHEN DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')) THEN 'today'
+            WHEN DATE(DATETIME(date_first_submitted, 'America/New_York')) = DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 DAY) THEN 'yesterday'
+        END as day_flag
+    FROM dbt_models.fct_jobs
+    WHERE type = 'TAX'
+        AND workspace_class IN ('B2C', 'B2B2C')
+        AND DATE(DATETIME(date_first_submitted, 'America/New_York')) >= DATE_SUB(DATE(DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')), INTERVAL 1 DAY)
+) sub
+GROUP BY hour_miami
+ORDER BY hour_miami
+```
+
+### Year-over-Year Cumulative (2026 vs 2025)
+
+```sql
+WITH daily_sales AS (
+    SELECT
+        EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) as year,
+        EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) as day_of_year,
+        COUNT(*) as daily_jobs
+    FROM dbt_models.fct_jobs
+    WHERE type = 'TAX'
+        AND workspace_class IN ('B2C', 'B2B2C')
+        AND (
+            (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025
+             AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+            OR
+            (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026
+             AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+        )
+    GROUP BY year, day_of_year
+)
+SELECT
+    day_of_year,
+    SUM(CASE WHEN year = 2026 THEN daily_jobs ELSE 0 END) as jobs_2026,
+    SUM(CASE WHEN year = 2025 THEN daily_jobs ELSE 0 END) as jobs_2025,
+    SUM(SUM(CASE WHEN year = 2026 THEN daily_jobs ELSE 0 END)) OVER (ORDER BY day_of_year) as cumulative_2026,
+    SUM(SUM(CASE WHEN year = 2025 THEN daily_jobs ELSE 0 END)) OVER (ORDER BY day_of_year) as cumulative_2025
+FROM daily_sales
+GROUP BY day_of_year
+ORDER BY day_of_year
+```
+
+### YoY Partner Performance - All B2C/B2B2C
+
+Chart name: `YoY Partner Performance - Season to Date`
+Description: `Compara jobs por partner: 2026 vs mismo período 2025. Diff negativo = behind last year.`
+
+```sql
+SELECT
+    CASE
+        WHEN workspace_id = 323 THEN 'Rocket Lawyer'
+        ELSE workspace_name
+    END as partner_name,
+    workspace_id,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END) as jobs_2026,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END) as jobs_2025,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END)
+    - SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END) as diff,
+    ROUND(
+        SAFE_DIVIDE(
+            SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END)
+        ) * 100, 1
+    ) as pct_of_last_year
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_class IN ('B2C', 'B2B2C')
+    AND (
+        (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025
+         AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+        OR
+        (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026
+         AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+    )
+GROUP BY partner_name, workspace_id
+ORDER BY diff ASC
+```
+
+### YoY Partner Performance - POS Only
+
+Chart name: `YoY Partner Performance - POS Only`
+Description: `Compara jobs por partner POS: 2026 vs mismo período 2025. Diff negativo = behind last year.`
+
+```sql
+SELECT
+    CASE
+        WHEN workspace_id = 323 THEN 'Rocket Lawyer'
+        ELSE workspace_name
+    END as partner_name,
+    workspace_id,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END) as jobs_2026,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END) as jobs_2025,
+    SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END)
+    - SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END) as diff,
+    ROUND(
+        SAFE_DIVIDE(
+            SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025 THEN 1 ELSE 0 END)
+        ) * 100, 1
+    ) as pct_of_last_year
+FROM dbt_models.fct_jobs
+WHERE type = 'TAX'
+    AND workspace_id IN (1, 323, 595, 1738, 1742, 1744)
+    AND (
+        (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2025
+         AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+        OR
+        (EXTRACT(YEAR FROM DATETIME(date_first_submitted, 'America/New_York')) = 2026
+         AND EXTRACT(DAYOFYEAR FROM DATETIME(date_first_submitted, 'America/New_York')) <= EXTRACT(DAYOFYEAR FROM DATETIME(CURRENT_TIMESTAMP(), 'America/New_York')))
+    )
+GROUP BY partner_name, workspace_id
+ORDER BY diff ASC
+```
+
+---
+
+## Additional Data Sources
+
+### Job Progression Timestamps (TBD)
+
+Granular timestamps for each step in the return fulfillment lifecycle exist across multiple database tables. These track:
+
+- Document Review started
+- Open Items requested
+- Draft Preparation started
+- Draft uploaded for review
+- Draft approved / changes requested
+- Authorization (8879) requested
+- Authorization received
+- Return filed
+- Job closed
+
+**Status**: Schema details pending — will be added once table structures are confirmed. These timestamps are critical for the **TXF Efficiency Dashboard** (measuring time-to-close improvements).
+
+### TXF Tables (Confirmed Locations & Schemas)
+
+TXF data spans two Fivetran schemas plus existing dbt models.
+
+#### Table Locations
+
+| Table | Dataset | Key Fields |
+|-------|---------|------------|
+| `txf_job` | `fivetran_etl_us_jobs_public` | `job_id`, `concurrency_version`, `date_created`, `date_modified` |
+| `worklayer_job` | `fivetran_etl_us_txf_public` | `job_id`, `concurrency_version`, `date_created`, `date_modified` |
+| `work_request` | `fivetran_etl_us_txf_public` | `id`, `date_created`, `client_id`, status (TBD exact field name) |
+| `work_request_file` | `fivetran_etl_us_txf_public` | `id`, `date_created`, `work_request_id`, `external_id`, `external_type` |
+| `client` | `fivetran_etl_us_txf_public` | `id`, `first_name`, `last_name`, `workspace_id`, `short_id` |
+| `tax_preparation_data` | `fivetran_etl_us_txf_public` | TBD |
+| `tax_preparation_data_version` | `fivetran_etl_us_txf_public` | TBD |
+| `tax_software_integration` | `fivetran_etl_us_txf_public` | TBD |
+| `data_entry_run` | `fivetran_etl_us_txf_public` | TBD |
+
+#### AI Extraction Tables (fivetran_etl_us_txf_public)
+
+Multiple AI model extraction logs:
+- `anthropic_extraction_process`
+- `gemini_extraction_process`
+- `openai_extraction_process`
+- `mistralai_extraction_process`
+- `textract_extraction_process`
+- `extraction_analytics_manager`
+
+#### Relationship Chain (Confirmed)
+
+```
+txf_job (fivetran_etl_us_jobs_public)
+    │
+    └── job_id ──→ worklayer_job.job_id (fivetran_etl_us_txf_public)
+
+client.id ──→ work_request.client_id
+work_request.id ──→ work_request_file.work_request_id
+work_request_file.external_id + external_type = "WORKLAYER_JOB" ──→ worklayer_job
+
+fct_jobs.id (dbt_models) ──→ txf_job.job_id (fivetran_etl_us_jobs_public)
+```
+
+#### Existing dbt Models for TXF
+
+These already exist in `dbt_models` and may have pre-built logic:
+
+| Table | Description |
+|-------|-------------|
+| `txf_mart` | TXF mart table (check schema) |
+| `txf_extraction_document_summary` | Document extraction summary |
+| `dim_txf_analytics` | TXF analytics dimension |
+| `dim_txf_events_workspace_id` | TXF events by workspace |
+| `dim_txf_match_analytics` | Match analytics |
+| `dim_txf_match_analytics_per_field` | Field-level match analytics |
+| `dim_txf_skip_correctness_analysis` | Skip/correctness analysis |
+| `dim_txf_verification_analysis` | Verification analysis |
+| `fct_work_request` | Work request fact table |
+| `stg_work_request_file_forms` | Staged work request file forms |
+| `dim_skip_correctness_analysis` | Skip correctness (also in dbt_models) |
+
+#### Critical Logic: Determining if TXF Was Actually Used
+
+**A record in `txf_job` alone does NOT mean TXF was used.**
+
+The `txf_job` table is minimal (just `job_id`, `concurrency_version`, dates). Since TXF jobs are now auto-created when documents are uploaded on enabled workspaces, you must check downstream tables for actual usage:
+
+1. Check **`work_request`** status — look for statuses indicating extraction completed + verification done
+2. Check **`work_request_file`** — may show which files were actually processed
+3. Check **existing dbt models** (`txf_mart`, `dim_txf_verification_analysis`) — may already have this logic built
+
+**Status values in `work_request`**: TBD — need to query distinct statuses to confirm.
+
+#### Three Pools for Comparison
+
+| Pool | Definition | Use For |
+|------|------------|---------|
+| **No TXF available** | Jobs in workspaces where TXF is NOT enabled (Heard, Simple Closure) | Baseline |
+| **TXF available, NOT used** | Jobs in TXF-enabled workspaces where work_request shows no completed extraction | Control group |
+| **TXF available AND used** | Jobs in TXF-enabled workspaces where work_request shows completed extraction + verification | Treatment group |
+
+#### Other TXF Data Notes
+
+- **TXF workspaces**: Stored in the same workspace table as regular workspaces (with a TXF flag)
+- **TXF users**: Stored in the same user table (no separate table)
+- **Access note**: `txf_job` in `fivetran_etl_us_jobs_public` — you can query it but don't have `tables.get` permission (no metadata access). Query directly works fine.
+- **SK will build a dbt model** once table relationships and status logic are fully confirmed
+
+### Job Progression Tables (Confirmed)
+
+These tables contain the step-by-step fulfillment timestamps:
+
+| Table | Dataset | Description |
+|-------|---------|-------------|
+| `job_progression` | `fivetran_etl_us_jobs_public` | Job-level progression records |
+| `job_progression_steps` | `fivetran_etl_us_jobs_public` | Individual step timestamps |
+| `fct_job_progression` | `dbt_models` | dbt fact table for progression |
+| `progression_steps_table` | `dbt_models` | Progression steps reference |
+
+**Status**: Need to query these to confirm schema, step names, and how they map to the fulfillment lifecycle (Document Review → Draft → Approval → Authorization → Close).
+
+There's also a testing dataset: `testing_fct_progression_step_optimization` — suggesting optimization work has been done on this model.
+
+### HubSpot Tables in dbt_models
+
+| Table | Description |
+|-------|-------------|
+| `dim_contacts_hubspot` | Contact dimension |
+| `dim_deal_hubspot` | Deal dimension (call center pipelines live here) |
+| `dim_jobs_hubspot` | Jobs object dimension |
+| `dim_workspaces_hubspot` | Workspace dimension |
+| `dim_email_performance_hubspot` | Email performance |
+| `fct_hubspot_contacts` | Contact fact table |
+| `fct_email_events_daily_hubspot` | Email events |
+
+**Note**: If HubSpot deal data is already in BigQuery via these tables, you may NOT need a separate data pipeline. Check if `dim_deal_hubspot` has call activity and pipeline stage data.
+
+### HubSpot Data (Call Center Metrics)
+
+Call center performance data lives in **HubSpot Deals** (not Contacts):
+
+| Data Point | Location | Notes |
+|------------|----------|-------|
+| Call attempts | Deal activity | Each call logged on the Deal |
+| Call outcome (connected/voicemail/no answer) | Deal activity | Determines contact coverage |
+| Deal stage changes | Deal properties | Pipeline progression |
+| Quote presented timestamp | Deal properties | Starts 24-hour clock |
+| Closed Won/Lost | Deal properties | Final outcome |
+
+**Note**: Sales Factory has a separate deal pipeline per workspace (except Empower, which uses an internal pipeline). All POS workspaces: Taxfyle B2C, Rocket Lawyer, PRISM, Vensure, Pinnacle, Berkshire, Empower.
+
+**Data Fragmentation**: BigQuery has job-level data; HubSpot has call center/deal data. A unified view requires either piping HubSpot data into BigQuery or building reports across both tools.
+
+---
+
+## Data Quality Notes
+
+1. **Numeric fields**: `total`, `paid_amount`, etc. are FLOAT64 in BigQuery - can use directly in SUM/AVG.
+
+2. **Date fields**: All dates are TIMESTAMP fields. Always convert to Miami timezone using `DATETIME(field, 'America/New_York')`.
+
+3. **Workspace name inconsistency**: Same `workspace_id` may have different `workspace_name` values. Use `workspace_id` for precise grouping, `workspace_class` for B2C/B2B2C filtering.
+
+4. **Empty strings vs null**: Many fields use empty strings (`""`) instead of null for missing values.
+
+5. **Boolean as strings**: `questions_completed` is a string (`"true"`/`"false"`), not a boolean. Note: `archived_status` is a proper BOOL despite what earlier docs stated.
+
+---
+
+## Season Reference
+
+| Parameter | 2026 Season | 2025 Season (for YoY) |
+|-----------|-------------|----------------------|
+| Season Start Date | January 19, 2026 | January 2025 |
+| Primary Tax Year | 2025 | 2024 |
+
+### YoY Comparison Notes
+
+When comparing year-over-year:
+- Use `EXTRACT(DAYOFYEAR FROM ...)` to align same calendar days
+- Filter both years up to the current day of year to ensure fair comparison
+- Example: On January 21, 2026, compare days 1-21 of both 2025 and 2026
